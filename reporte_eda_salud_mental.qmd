@@ -1,0 +1,376 @@
+---
+title: "EDA del dataset: Salud Mental en Adolescentes"
+author: "Sebastian Albornoz y Ariel Soto"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: true
+execute:
+  warning: false
+  message: false
+---
+
+## Introducción
+
+Este reporte realiza un análisis exploratorio de datos (EDA) del dataset **Teen Mental Health**. El mismo trata sobre el estado de salud mental de los adolescentes y si es consecuencia del uso de las redes sociales.
+
+```{r}
+#| label: setup
+library(tidyverse)
+library(knitr)
+
+theme_set(theme_minimal(base_size = 12))
+
+options(
+  dplyr.summarise.inform = FALSE,
+  scipen = 999
+)
+```
+
+## Importación y descripción del dataset
+
+```{r}
+#| label: importacion
+archivo <- if (file.exists("Teen_Mental_Health.csv")) {
+  "Teen_Mental_Health.csv"
+} else {
+  "dataset.csv"
+}
+
+datos <- read.csv(
+  archivo,
+  stringsAsFactors = FALSE,
+  fileEncoding = "UTF-8-BOM",
+  check.names = FALSE
+) |>
+  as_tibble()
+
+glimpse(datos)
+```
+
+El dataset importado contiene `r nrow(datos)` observaciones y `r ncol(datos)` variables. Cada fila representa un registro de un adolescente y cada columna describe una característica asociada al uso de redes sociales, sueño, actividad física, rendimiento académico o indicadores de salud mental.
+
+```{r}
+#| label: vista-datos
+head(datos, 10) |>
+  kable(caption = "Primeras 10 observaciones del dataset")
+```
+
+## Identificación de variables estadísticas
+
+Las variables estadísticas se clasifican según el tipo de dato que representan:
+
+- **Variables numéricas:** Representan cantidades y sus valores son números sobre los que generalmente tiene sentido realizar operaciones matemáticas.
+- **Variables categóricas:** representan grupos, etiquetas o clases. En ellas no corresponde calcular media o cuantiles, pero sí frecuencias y moda.
+
+```{r}
+#| label: tipos-variables
+clasificacion_variables <- tibble(
+  variable = names(datos),
+  tipo_en_r = map_chr(datos, ~ class(.x)[1]),
+  tipo_estadistico = case_when(
+    map_lgl(datos, is.numeric) ~ "Numérica",
+    TRUE ~ "Categórica"
+  )
+)
+
+clasificacion_variables |>
+  kable(caption = "Clasificación de variables del dataset")
+```
+
+En este dataset, las variables numéricas permiten estudiar magnitudes como edad, horas de sueño, horas de redes sociales, actividad física, niveles de estrés, ansiedad, adicción y puntaje de riesgo de salud mental. Las variables categóricas describen atributos como género, plataforma más usada, nivel de interacción social, etiqueta de depresión, calidad del sueño y bandera de bienestar digital.
+
+## Medidas de posición
+
+### Funciones auxiliares
+
+```{r}
+#| label: funciones
+calcular_moda <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) return(NA_character_)
+
+  frecuencias <- sort(table(x), decreasing = TRUE)
+  max_frecuencia <- max(frecuencias)
+  modas <- names(frecuencias[frecuencias == max_frecuencia])
+
+  paste(modas, collapse = ", ")
+}
+
+interpretar_sesgo <- function(media, mediana) {
+  if (is.na(media) || is.na(mediana)) {
+    "No evaluable"
+  } else if (abs(media - mediana) < 0.05) {
+    "Aproximadamente simétrica"
+  } else if (media > mediana) {
+    "Asimetría hacia la derecha"
+  } else {
+    "Asimetría hacia la izquierda"
+  }
+}
+```
+
+### Variables numéricas
+
+Para cada variable numérica se calculan:
+
+- **Media aritmética:** suma de todos los valores dividida por la cantidad de datos.
+- **Mediana:** valor central cuando los datos están ordenados.
+- **Moda:** valor o valores que más se repiten.
+- **Cuartiles:** valores que separan el 25%, 50% y 75% de los datos.
+- **Deciles:** valores que dividen los datos ordenados en diez partes.
+- **Percentiles seleccionados:** valores que permiten ubicar porcentajes específicos de la distribución.
+
+```{r}
+#| label: medidas-numericas
+variables_numericas <- datos |>
+  select(where(is.numeric)) |>
+  names()
+
+resumen_numerico <- datos |>
+  summarise(
+    across(
+      all_of(variables_numericas),
+      list(
+        n = ~ sum(!is.na(.x)),
+        media = ~ mean(.x, na.rm = TRUE),
+        mediana = ~ median(.x, na.rm = TRUE),
+        moda = ~ calcular_moda(.x),
+        minimo = ~ min(.x, na.rm = TRUE),
+        q1 = ~ quantile(.x, 0.25, na.rm = TRUE),
+        q2 = ~ quantile(.x, 0.50, na.rm = TRUE),
+        q3 = ~ quantile(.x, 0.75, na.rm = TRUE),
+        maximo = ~ max(.x, na.rm = TRUE),
+        p5 = ~ quantile(.x, 0.05, na.rm = TRUE),
+        p10 = ~ quantile(.x, 0.10, na.rm = TRUE),
+        p90 = ~ quantile(.x, 0.90, na.rm = TRUE),
+        p95 = ~ quantile(.x, 0.95, na.rm = TRUE)
+      ),
+      .names = "{.col}__{.fn}"
+    )
+  ) |>
+  pivot_longer(
+    cols = everything(),
+    names_to = c("variable", "medida"),
+    names_sep = "__",
+    values_to = "valor",
+    values_transform = list(valor = as.character)
+  ) |>
+  pivot_wider(names_from = medida, values_from = valor) |>
+  mutate(across(-c(variable, moda), ~ round(as.numeric(.x), 2)))
+
+resumen_numerico |>
+  kable(caption = "Medidas de posición para variables numéricas")
+```
+
+```{r}
+#| label: deciles
+deciles <- datos |>
+  select(all_of(variables_numericas)) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "valor") |>
+  group_by(variable) |>
+  summarise(
+    D1 = quantile(valor, 0.10, na.rm = TRUE),
+    D2 = quantile(valor, 0.20, na.rm = TRUE),
+    D3 = quantile(valor, 0.30, na.rm = TRUE),
+    D4 = quantile(valor, 0.40, na.rm = TRUE),
+    D5 = quantile(valor, 0.50, na.rm = TRUE),
+    D6 = quantile(valor, 0.60, na.rm = TRUE),
+    D7 = quantile(valor, 0.70, na.rm = TRUE),
+    D8 = quantile(valor, 0.80, na.rm = TRUE),
+    D9 = quantile(valor, 0.90, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric), ~ round(.x, 2)))
+
+deciles |>
+  kable(caption = "Deciles de las variables numéricas")
+```
+
+### Variables categóricas
+
+En las variables categóricas no se calculan media, mediana o cuantiles porque sus valores son etiquetas y no cantidades. Para describirlas se utiliza la **moda** y las **frecuencias** de cada categoría.
+
+```{r}
+#| label: medidas-categoricas
+variables_categoricas <- datos |>
+  select(!where(is.numeric)) |>
+  names()
+
+resumen_categorico <- datos |>
+  summarise(
+    across(
+      all_of(variables_categoricas),
+      list(
+        n = ~ sum(!is.na(.x)),
+        categorias = ~ n_distinct(.x, na.rm = TRUE),
+        moda = ~ calcular_moda(.x)
+      ),
+      .names = "{.col}__{.fn}"
+    )
+  ) |>
+  pivot_longer(
+    cols = everything(),
+    names_to = c("variable", "medida"),
+    names_sep = "__",
+    values_to = "valor",
+    values_transform = list(valor = as.character)
+  ) |>
+  pivot_wider(names_from = medida, values_from = valor)
+
+resumen_categorico |>
+  kable(caption = "Resumen de variables categóricas")
+```
+
+## Histogramas, intervalos y tablas de frecuencias
+
+Un histograma agrupa datos numéricos continuos o discretos en **intervalos de clase**. Cada intervalo tiene un límite inferior y un límite superior. La **amplitud** es el tamaño del intervalo y la **marca de clase** es el punto medio, calculado como:
+
+\[
+\text{marca de clase} = \frac{\text{límite inferior} + \text{límite superior}}{2}
+\]
+
+La tabla de frecuencias indica cuántas observaciones caen en cada intervalo:
+
+- **Frecuencia absoluta:** cantidad de datos dentro del intervalo.
+- **Frecuencia relativa:** proporción respecto del total.
+- **Frecuencia porcentual:** frecuencia relativa expresada en porcentaje.
+- **Frecuencia acumulada:** suma progresiva de frecuencias hasta cada intervalo.
+
+```{r}
+#| label: tabla-frecuencias-histograma
+crear_tabla_frecuencia <- function(data, variable, bins = NULL) {
+  x <- data[[variable]]
+  x <- x[!is.na(x)]
+
+  if (is.null(bins)) {
+    bins <- ceiling(1 + log2(length(x)))
+  }
+
+  cortes <- pretty(range(x), n = bins)
+
+  tibble(valor = x) |>
+    mutate(intervalo = cut(valor, breaks = cortes, include.lowest = TRUE, right = FALSE)) |>
+    count(intervalo, name = "frecuencia_absoluta") |>
+    mutate(
+      limite_inferior = as.numeric(str_extract(as.character(intervalo), "-?\\d+\\.?\\d*")),
+      limite_superior = as.numeric(str_extract(as.character(intervalo), "(?<=,)\\s*-?\\d+\\.?\\d*")),
+      amplitud = limite_superior - limite_inferior,
+      marca_de_clase = (limite_inferior + limite_superior) / 2,
+      frecuencia_relativa = frecuencia_absoluta / sum(frecuencia_absoluta),
+      frecuencia_porcentual = frecuencia_relativa * 100,
+      frecuencia_acumulada = cumsum(frecuencia_absoluta)
+    ) |>
+    select(
+      intervalo,
+      limite_inferior,
+      limite_superior,
+      amplitud,
+      marca_de_clase,
+      frecuencia_absoluta,
+      frecuencia_relativa,
+      frecuencia_porcentual,
+      frecuencia_acumulada
+    )
+}
+
+tablas_histograma <- map(
+  variables_numericas,
+  ~ crear_tabla_frecuencia(datos, .x) |>
+    mutate(variable = .x, .before = 1)
+) |>
+  bind_rows()
+
+tablas_histograma |>
+  mutate(
+    across(
+      c(limite_inferior, limite_superior, amplitud, marca_de_clase,
+        frecuencia_relativa, frecuencia_porcentual),
+      ~ round(.x, 3)
+    )
+  ) |>
+  kable(caption = "Tablas de frecuencias por intervalos para variables numéricas")
+```
+
+En la construcción del histograma, las barras son adyacentes porque los intervalos representan rangos continuos. El eje horizontal muestra los intervalos de clase y el eje vertical muestra la frecuencia. Cuando los intervalos tienen la misma amplitud, la altura de cada barra permite comparar directamente la frecuencia de cada clase.
+
+Los histogramas se construyen para las variables numéricas, ya que estas variables permiten ordenar y agrupar los datos en intervalos.
+
+```{r}
+#| label: histogramas
+#| fig-width: 10
+#| fig-height: 12
+datos |>
+  select(all_of(variables_numericas)) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "valor") |>
+  ggplot(aes(x = valor)) +
+  geom_histogram(bins = 10, fill = "#2F80ED", color = "white", linewidth = 0.3) +
+  facet_wrap(~ variable, scales = "free", ncol = 2) +
+  labs(
+    title = "Histogramas de las variables numéricas",
+    x = "Valor observado",
+    y = "Frecuencia"
+  )
+```
+
+## Diagramas de caja
+
+Los diagramas de caja permiten observar la mediana, los cuartiles, el rango intercuartílico y posibles valores atípicos. Igual que los histogramas, se construyen para las variables numéricas.
+
+```{r}
+#| label: diagramas-caja
+#| fig-width: 10
+#| fig-height: 12
+datos |>
+  select(all_of(variables_numericas)) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "valor") |>
+  ggplot(aes(x = variable, y = valor)) +
+  geom_boxplot(fill = "#27AE60", color = "#1F2933", outlier.color = "#C0392B") +
+  facet_wrap(~ variable, scales = "free", ncol = 2) +
+  labs(
+    title = "Diagramas de caja de las variables numéricas",
+    x = NULL,
+    y = "Valor observado"
+  ) +
+  theme(axis.text.x = element_blank())
+```
+
+## Interpretación visual de los histogramas
+
+Para interpretar un histograma se observa la forma general de la distribución:
+
+- Si las barras se concentran de manera similar a ambos lados del centro, la distribución es aproximadamente simétrica.
+- Si la cola se extiende hacia valores altos, se interpreta como asimetría hacia la derecha.
+- Si la cola se extiende hacia valores bajos, se interpreta como asimetría hacia la izquierda.
+- Si aparecen barras aisladas lejos del resto o puntos extremos en el diagrama de caja, puede haber datos atípicos.
+
+```{r}
+#| label: interpretacion
+interpretacion_numerica <- datos |>
+  select(all_of(variables_numericas)) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "valor") |>
+  group_by(variable) |>
+  summarise(
+    media = mean(valor, na.rm = TRUE),
+    mediana = median(valor, na.rm = TRUE),
+    q1 = quantile(valor, 0.25, na.rm = TRUE),
+    q3 = quantile(valor, 0.75, na.rm = TRUE),
+    iqr = IQR(valor, na.rm = TRUE),
+    limite_inferior_atipicos = q1 - 1.5 * iqr,
+    limite_superior_atipicos = q3 + 1.5 * iqr,
+    posibles_atipicos = sum(
+      valor < limite_inferior_atipicos | valor > limite_superior_atipicos,
+      na.rm = TRUE
+    ),
+    forma_aproximada = interpretar_sesgo(media, mediana),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric), ~ round(.x, 2)))
+
+interpretacion_numerica |>
+  kable(caption = "Interpretación resumida de la forma de las distribuciones numéricas")
+```
+
+En términos generales, esta tabla permite relacionar lo observado en los histogramas con medidas numéricas. Cuando la media y la mediana son parecidas, la variable tiende a presentar una distribución más equilibrada. Si la media es mayor que la mediana, se interpreta como sesgo hacia valores altos. Si la media es menor que la mediana, se interpreta como sesgo hacia valores bajos. La columna de posibles valores atípicos complementa lo observado en los diagramas de caja.
