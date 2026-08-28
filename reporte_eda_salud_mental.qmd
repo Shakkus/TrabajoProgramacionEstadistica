@@ -1,13 +1,20 @@
 ---
 title: "EDA del dataset: Salud Mental en Adolescentes"
 author: "Sebastian Albornoz y Ariel Soto"
+lang: es
+toc-title: "Indice"
 format:
+  typst:
+    toc: true
+    toc-depth: 3
+    number-sections: true
   html:
     toc: true
     toc-depth: 3
     number-sections: true
     code-fold: true
 execute:
+  echo: false
   warning: false
   message: false
 ---
@@ -47,16 +54,17 @@ datos <- read.csv(
 ) |>
   as_tibble()
 
-glimpse(datos)
+descripcion_dataset <- tibble(
+  archivo = archivo,
+  observaciones = nrow(datos),
+  variables = ncol(datos)
+)
+
+descripcion_dataset |>
+  kable(caption = "Descripcion general del dataset")
 ```
 
 El dataset importado contiene `r nrow(datos)` observaciones y `r ncol(datos)` variables. Cada fila representa un registro de un adolescente y cada columna describe una característica asociada al uso de redes sociales, sueño, actividad física, rendimiento académico o indicadores de salud mental.
-
-```{r}
-#| label: vista-datos
-head(datos, 10) |>
-  kable(caption = "Primeras 10 observaciones del dataset")
-```
 
 ## Identificación de variables estadísticas
 
@@ -71,13 +79,13 @@ clasificacion_variables <- tibble(
   variable = names(datos),
   tipo_en_r = map_chr(datos, ~ class(.x)[1]),
   tipo_estadistico = case_when(
-    map_lgl(datos, is.numeric) ~ "Numérica",
-    TRUE ~ "Categórica"
+    map_lgl(datos, is.numeric) ~ "Numerica",
+    TRUE ~ "Categorica"
   )
 )
 
 clasificacion_variables |>
-  kable(caption = "Clasificación de variables del dataset")
+  kable(caption = "Clasificacion de variables del dataset")
 ```
 
 En este dataset, las variables numéricas permiten estudiar magnitudes como edad, horas de sueño, horas de redes sociales, actividad física, niveles de estrés, ansiedad, adicción y puntaje de riesgo de salud mental. Las variables categóricas describen atributos como género, plataforma más usada, nivel de interacción social, etiqueta de depresión, calidad del sueño y bandera de bienestar digital.
@@ -103,11 +111,11 @@ interpretar_sesgo <- function(media, mediana) {
   if (is.na(media) || is.na(mediana)) {
     "No evaluable"
   } else if (abs(media - mediana) < 0.05) {
-    "Aproximadamente simétrica"
+    "Aproximadamente simetrica"
   } else if (media > mediana) {
-    "Asimetría hacia la derecha"
+    "Asimetria hacia la derecha"
   } else {
-    "Asimetría hacia la izquierda"
+    "Asimetria hacia la izquierda"
   }
 }
 ```
@@ -162,7 +170,13 @@ resumen_numerico <- datos |>
   mutate(across(-c(variable, moda), ~ round(as.numeric(.x), 2)))
 
 resumen_numerico |>
-  kable(caption = "Medidas de posición para variables numéricas")
+  mutate(across(-variable, as.character)) |>
+  pivot_longer(
+    cols = -variable,
+    names_to = "medida",
+    values_to = "valor"
+  ) |>
+  kable(caption = "Medidas de posicion para variables numericas")
 ```
 
 ```{r}
@@ -186,7 +200,12 @@ deciles <- datos |>
   mutate(across(where(is.numeric), ~ round(.x, 2)))
 
 deciles |>
-  kable(caption = "Deciles de las variables numéricas")
+  pivot_longer(
+    cols = -variable,
+    names_to = "decil",
+    values_to = "valor"
+  ) |>
+  kable(caption = "Deciles de las variables numericas")
 ```
 
 ### Variables categóricas
@@ -221,16 +240,12 @@ resumen_categorico <- datos |>
   pivot_wider(names_from = medida, values_from = valor)
 
 resumen_categorico |>
-  kable(caption = "Resumen de variables categóricas")
+  kable(caption = "Resumen de variables categoricas")
 ```
 
 ## Histogramas, intervalos y tablas de frecuencias
 
-Un histograma agrupa datos numéricos continuos o discretos en **intervalos de clase**. Cada intervalo tiene un límite inferior y un límite superior. La **amplitud** es el tamaño del intervalo y la **marca de clase** es el punto medio, calculado como:
-
-\[
-\text{marca de clase} = \frac{\text{límite inferior} + \text{límite superior}}{2}
-\]
+Un histograma agrupa datos numéricos continuos o discretos en **intervalos de clase**. Cada intervalo tiene un límite inferior y un límite superior. La **amplitud** es el tamaño del intervalo y la **marca de clase** es el punto medio. Se calcula como: marca de clase = (límite inferior + límite superior) / 2.
 
 La tabla de frecuencias indica cuántas observaciones caen en cada intervalo:
 
@@ -291,7 +306,24 @@ tablas_histograma |>
       ~ round(.x, 3)
     )
   ) |>
-  kable(caption = "Tablas de frecuencias por intervalos para variables numéricas")
+  select(
+    variable,
+    intervalo,
+    limite_inferior,
+    limite_superior,
+    amplitud,
+    marca_de_clase,
+    frecuencia_absoluta,
+    frecuencia_relativa,
+    frecuencia_porcentual,
+    frecuencia_acumulada
+  ) |>
+  pivot_longer(
+    cols = -c(variable, intervalo),
+    names_to = "medida",
+    values_to = "valor"
+  ) |>
+  kable(caption = "Tablas de frecuencias por intervalos para variables numericas")
 ```
 
 En la construcción del histograma, las barras son adyacentes porque los intervalos representan rangos continuos. El eje horizontal muestra los intervalos de clase y el eje vertical muestra la frecuencia. Cuando los intervalos tienen la misma amplitud, la altura de cada barra permite comparar directamente la frecuencia de cada clase.
@@ -300,8 +332,8 @@ Los histogramas se construyen para las variables numéricas, ya que estas variab
 
 ```{r}
 #| label: histogramas
-#| fig-width: 10
-#| fig-height: 12
+#| fig-width: 7
+#| fig-height: 9
 datos |>
   select(all_of(variables_numericas)) |>
   pivot_longer(everything(), names_to = "variable", values_to = "valor") |>
@@ -309,7 +341,7 @@ datos |>
   geom_histogram(bins = 10, fill = "#2F80ED", color = "white", linewidth = 0.3) +
   facet_wrap(~ variable, scales = "free", ncol = 2) +
   labs(
-    title = "Histogramas de las variables numéricas",
+    title = "Histogramas de las variables numericas",
     x = "Valor observado",
     y = "Frecuencia"
   )
@@ -321,8 +353,8 @@ Los diagramas de caja permiten observar la mediana, los cuartiles, el rango inte
 
 ```{r}
 #| label: diagramas-caja
-#| fig-width: 10
-#| fig-height: 12
+#| fig-width: 7
+#| fig-height: 9
 datos |>
   select(all_of(variables_numericas)) |>
   pivot_longer(everything(), names_to = "variable", values_to = "valor") |>
@@ -330,7 +362,7 @@ datos |>
   geom_boxplot(fill = "#27AE60", color = "#1F2933", outlier.color = "#C0392B") +
   facet_wrap(~ variable, scales = "free", ncol = 2) +
   labs(
-    title = "Diagramas de caja de las variables numéricas",
+    title = "Diagramas de caja de las variables numericas",
     x = NULL,
     y = "Valor observado"
   ) +
@@ -345,32 +377,3 @@ Para interpretar un histograma se observa la forma general de la distribución:
 - Si la cola se extiende hacia valores altos, se interpreta como asimetría hacia la derecha.
 - Si la cola se extiende hacia valores bajos, se interpreta como asimetría hacia la izquierda.
 - Si aparecen barras aisladas lejos del resto o puntos extremos en el diagrama de caja, puede haber datos atípicos.
-
-```{r}
-#| label: interpretacion
-interpretacion_numerica <- datos |>
-  select(all_of(variables_numericas)) |>
-  pivot_longer(everything(), names_to = "variable", values_to = "valor") |>
-  group_by(variable) |>
-  summarise(
-    media = mean(valor, na.rm = TRUE),
-    mediana = median(valor, na.rm = TRUE),
-    q1 = quantile(valor, 0.25, na.rm = TRUE),
-    q3 = quantile(valor, 0.75, na.rm = TRUE),
-    iqr = IQR(valor, na.rm = TRUE),
-    limite_inferior_atipicos = q1 - 1.5 * iqr,
-    limite_superior_atipicos = q3 + 1.5 * iqr,
-    posibles_atipicos = sum(
-      valor < limite_inferior_atipicos | valor > limite_superior_atipicos,
-      na.rm = TRUE
-    ),
-    forma_aproximada = interpretar_sesgo(media, mediana),
-    .groups = "drop"
-  ) |>
-  mutate(across(where(is.numeric), ~ round(.x, 2)))
-
-interpretacion_numerica |>
-  kable(caption = "Interpretación resumida de la forma de las distribuciones numéricas")
-```
-
-En términos generales, esta tabla permite relacionar lo observado en los histogramas con medidas numéricas. Cuando la media y la mediana son parecidas, la variable tiende a presentar una distribución más equilibrada. Si la media es mayor que la mediana, se interpreta como sesgo hacia valores altos. Si la media es menor que la mediana, se interpreta como sesgo hacia valores bajos. La columna de posibles valores atípicos complementa lo observado en los diagramas de caja.
