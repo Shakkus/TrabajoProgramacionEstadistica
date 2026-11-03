@@ -40,17 +40,21 @@ Para la descarga desde Kaggle, configurar el token de la API en `~/.kaggle/kaggl
    cp datos/Teen_Mental_Health.csv datos/dataset.csv
    ```
 
-3. Renderizar el reporte EDA y el dashboard:
+3. Renderizar el reporte EDA y el dashboard (desde la raíz del proyecto):
 
    ```bash
    quarto render scripts/reporte_eda_salud_mental.qmd --to html --output-dir ../reportes
-   quarto render scripts/dashboard_salud_mental.qmd --to dashboard --output-dir ../reportes
+   cd scripts && quarto render dashboard_salud_mental.qmd --to dashboard && cd ..
    ```
+
+   El dashboard usa Shiny y **debe renderizarse dentro de `scripts/`** (Quarto no permite `--output-dir` con `server: shiny`).
+
+   Si aparece `quarto: command not found`, instalá [Quarto](https://quarto.org/docs/get-started/) y **cerrá y volvé a abrir** la terminal (o usá la ruta completa en Windows: `"C:/Program Files/Quarto/bin/quarto.exe" render ...`).
 
 4. Abrir en el navegador:
 
    - `reportes/reporte_eda_salud_mental.html` (junto con `reporte_eda_salud_mental_files`)
-   - `reportes/dashboard_salud_mental.html` (dashboard interactivo; requiere servir con Shiny embebido al abrirlo)
+   - `scripts/dashboard_salud_mental.html` (dashboard interactivo; junto con `dashboard_salud_mental_files`)
 
 ## Estructura
 

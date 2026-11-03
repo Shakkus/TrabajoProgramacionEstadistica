@@ -106,15 +106,12 @@ calcular_moda <- function(x) {
 }
 
 interpretar_sesgo <- function(media, mediana) {
-  if (is.na(media) || is.na(mediana)) {
-    "No evaluable"
-  } else if (abs(media - mediana) < 0.05) {
-    "Aproximadamente simetrica"
-  } else if (media > mediana) {
-    "Asimetria hacia la derecha"
-  } else {
-    "Asimetria hacia la izquierda"
-  }
+  case_when(
+    is.na(media) | is.na(mediana) ~ "No evaluable",
+    abs(media - mediana) < 0.05 ~ "Aproximadamente simetrica",
+    media > mediana ~ "Asimetria hacia la derecha",
+    TRUE ~ "Asimetria hacia la izquierda"
+  )
 }
 
 calcular_cortes <- function(x, bins = NULL) {
