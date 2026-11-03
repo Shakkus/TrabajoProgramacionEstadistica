@@ -1,0 +1,243 @@
+---
+title: "Dashboard: Salud Mental en Adolescentes"
+author: "Sebastian Albornoz"
+lang: es
+format:
+  dashboard:
+    theme: cosmo
+    orientation: rows
+server: shiny
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| context: setup
+library(tidyverse)
+library(shiny)
+
+theme_set(theme_minimal(base_size = 12))
+
+candidatos <- c(
+  file.path("..", "datos", "dataset.csv"),
+  file.path("..", "datos", "Teen_Mental_Health.csv"),
+  "dataset.csv"
+)
+archivo <- candidatos[file.exists(candidatos)][1]
+
+datos <- read.csv(
+  archivo,
+  stringsAsFactors = FALSE,
+  fileEncoding = "UTF-8-BOM",
+  check.names = FALSE
+) |>
+  as_tibble() |>
+  mutate(
+    depression_label = as.character(depression_label),
+    depresion = if_else(depression_label == "1", "Con depresion", "Sin depresion")
+  )
+
+variables_numericas <- datos |>
+  select(where(is.numeric)) |>
+  names()
+```
+
+# Resumen
+
+## Row {height="25%"}
+
+### Observaciones
+
+```{r}
+#| content: valuebox
+#| title: "Observaciones"
+#| icon: "people"
+#| color: primary
+nrow(datos)
+```
+
+### Edad promedio
+
+```{r}
+#| content: valuebox
+#| title: "Edad promedio"
+#| icon: "calendar3"
+#| color: info
+round(mean(datos$age, na.rm = TRUE), 1)
+```
+
+### Horas en redes
+
+```{r}
+#| content: valuebox
+#| title: "Horas diarias en redes"
+#| icon: "phone"
+#| color: warning
+round(mean(datos$daily_social_media_hours, na.rm = TRUE), 1)
+```
+
+### Riesgo de salud mental
+
+```{r}
+#| content: valuebox
+#| title: "Puntaje de riesgo (media)"
+#| icon: "heart-pulse"
+#| color: danger
+round(mean(datos$mental_health_risk_score, na.rm = TRUE), 1)
+```
+
+## Row {height="75%"}
+
+### Indicadores promedio
+
+```{r}
+#| fig-height: 4
+datos |>
+  summarise(
+    Sueño = mean(sleep_hours, na.rm = TRUE),
+    Estres = mean(stress_level, na.rm = TRUE),
+    Ansiedad = mean(anxiety_level, na.rm = TRUE),
+    `Rendimiento academico` = mean(academic_performance, na.rm = TRUE)
+  ) |>
+  pivot_longer(everything(), names_to = "indicador", values_to = "valor") |>
+  ggplot(aes(x = indicador, y = valor, fill = indicador)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = round(valor, 2)), vjust = -0.3) +
+  labs(x = NULL, y = "Promedio", title = "Promedios de indicadores de bienestar") +
+  theme(axis.text.x = element_text(angle = 25, hjust = 1))
+```
+
+# Exploracion interactiva
+
+## Sidebar {.sidebar}
+
+```{r}
+selectInput(
+  "variable_num",
+  "Variable numerica",
+  choices = variables_numericas,
+  selected = "mental_health_risk_score"
+)
+
+selectInput(
+  "genero",
+  "Genero",
+  choices = c("Todos", sort(unique(datos$gender))),
+  selected = "Todos"
+)
+
+selectInput(
+  "bienestar",
+  "Bienestar digital",
+  choices = c("Todos", sort(unique(datos$digital_wellbeing_flag))),
+  selected = "Todos"
+)
+```
+
+## Row
+
+### Histograma
+
+```{r}
+#| fig-height: 5
+filtrar_datos <- function(data, genero, bienestar) {
+  resultado <- data
+  if (genero != "Todos") {
+    resultado <- resultado |> filter(gender == genero)
+  }
+  if (bienestar != "Todos") {
+    resultado <- resultado |> filter(digital_wellbeing_flag == bienestar)
+  }
+  resultado
+}
+
+renderPlot({
+  filtrado <- filtrar_datos(datos, input$genero, input$bienestar)
+
+  ggplot(filtrado, aes(x = .data[[input$variable_num]])) +
+    geom_histogram(bins = 15, fill = "#2F80ED", color = "white", linewidth = 0.3) +
+    labs(
+      title = paste("Distribucion de", input$variable_num),
+      subtitle = paste(nrow(filtrado), "observaciones con los filtros actuales"),
+      x = "Valor",
+      y = "Frecuencia"
+    )
+})
+```
+
+### Diagrama de caja
+
+```{r}
+#| fig-height: 5
+renderPlot({
+  filtrado <- filtrar_datos(datos, input$genero, input$bienestar)
+
+  ggplot(filtrado, aes(y = .data[[input$variable_num]])) +
+    geom_boxplot(fill = "#27AE60", outlier.color = "#C0392B") +
+    labs(
+      title = paste("Diagrama de caja:", input$variable_num),
+      y = "Valor"
+    )
+})
+```
+
+# Perfil del dataset
+
+## Row {height="50%"}
+
+### Plataformas
+
+```{r}
+#| fig-height: 4
+datos |>
+  count(platform_usage, sort = TRUE) |>
+  mutate(platform_usage = fct_reorder(platform_usage, n)) |>
+  ggplot(aes(x = platform_usage, y = n, fill = platform_usage)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(x = NULL, y = "Frecuencia", title = "Uso de plataformas")
+```
+
+### Bienestar digital
+
+```{r}
+#| fig-height: 4
+datos |>
+  count(digital_wellbeing_flag) |>
+  ggplot(aes(x = digital_wellbeing_flag, y = n, fill = digital_wellbeing_flag)) +
+  geom_col(show.legend = FALSE) +
+  labs(x = NULL, y = "Frecuencia", title = "Bandera de bienestar digital")
+```
+
+## Row {height="50%"}
+
+### Redes sociales y riesgo
+
+```{r}
+#| fig-height: 4
+ggplot(datos, aes(x = daily_social_media_hours, y = mental_health_risk_score, color = depresion)) +
+  geom_point(alpha = 0.35) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 0.8) +
+  labs(
+    x = "Horas diarias en redes",
+    y = "Puntaje de riesgo",
+    color = "Depresion",
+    title = "Relacion entre uso de redes y riesgo de salud mental"
+  )
+```
+
+### Sueño y estres
+
+```{r}
+#| fig-height: 4
+ggplot(datos, aes(x = sleep_hours, y = stress_level, color = sleep_quality)) +
+  geom_point(alpha = 0.35) +
+  labs(
+    x = "Horas de sueno",
+    y = "Nivel de estres",
+    color = "Calidad del sueno",
+    title = "Sueño y estres segun calidad del sueno"
+  )
+```

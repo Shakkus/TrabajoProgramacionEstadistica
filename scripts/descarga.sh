@@ -1,19 +1,31 @@
 #!/bin/bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DATOS_DIR="$ROOT/datos"
+TMP_DIR="$ROOT/.tmp_descarga"
+
+mkdir -p "$DATOS_DIR" "$TMP_DIR"
+cd "$TMP_DIR"
 
 echo "Iniciando descarga del dataset con curl..."
 
-# 1. Descarga directa con curl en la carpeta actual del proyecto
-curl -L -o teen-mental-health.zip https://www.kaggle.com/api/v1/datasets/download/argonnxx/teen-mental-health
+curl -L -o teen-mental-health.zip \
+  https://www.kaggle.com/api/v1/datasets/download/argonnxx/teen-mental-health
 
 echo "Descomprimiendo archivos..."
-
-# 2. Descompresión del archivo zip
 unzip -o teen-mental-health.zip
 
-# 3. Limpieza inicial: renombrar el archivo extraído a dataset.csv
-mv *.csv dataset.csv
+CSV_ORIGEN="$(find . -maxdepth 1 -type f -name '*.csv' | head -n 1)"
+if [ -z "$CSV_ORIGEN" ]; then
+  echo "Error: no se encontro un archivo CSV dentro del zip." >&2
+  exit 1
+fi
 
-# 4. Eliminar el archivo .zip para limpiar el directorio
-rm teen-mental-health.zip
+echo "Limpieza inicial con sed y awk..."
+sed '1s/^\xEF\xBB\xBF//' "$CSV_ORIGEN" | awk 'NF > 0 { print }' > "$DATOS_DIR/dataset.csv"
 
-echo "¡Proceso completado! El archivo dataset.csv está listo para ser importado en el notebook de Quarto."
+rm -f teen-mental-health.zip
+rm -rf "$TMP_DIR"
+
+echo "Proceso completado. Archivo listo: $DATOS_DIR/dataset.csv"
