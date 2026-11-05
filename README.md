@@ -65,21 +65,11 @@ Para la descarga desde Kaggle, configurar el token en `~/.kaggle/kaggle.json` (o
    - **Dashboard:** `docs/dashboard_salud_mental.html` (y carpeta `docs/dashboard_salud_mental_files`)
    - **Reporte EDA:** `reportes/reporte_eda_salud_mental.html` (y `reporte_eda_salud_mental_files`)
 
-6. **Guía de estudio (PDF):**
-
-   ```bash
-   quarto render guia_aprendizaje.qmd --to typst --output-dir reportes
-   ```
-
-   Salida: `reportes/guia_aprendizaje.pdf` (temas, fórmulas y reproducción detallada).
-
-## Estructura
 
 | Ruta | Descripción |
 |------|-------------|
 | `_quarto.yml` | Proyecto Quarto tipo *website*; salida en `docs/` |
 | `dashboard_salud_mental.qmd` | Dashboard principal (raíz del proyecto) |
-| `guia_aprendizaje.qmd` | Guía en PDF (fórmulas, temas, reproducción) |
 | `scripts/descarga.sh` | Descarga, descompresión y limpieza del CSV |
 | `scripts/reporte_eda_salud_mental.qmd` | Reporte EDA (consigna estadística) |
 | `datos/` | `dataset.csv` / `Teen_Mental_Health.csv` |
