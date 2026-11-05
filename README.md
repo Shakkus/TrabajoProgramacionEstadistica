@@ -6,7 +6,7 @@ Sebastian Albornoz
 
 ## Resumen
 
-Proyecto transversal de Programación y Estadística sobre el dataset **Teen Mental Health** (Kaggle). Incluye descarga y limpieza inicial del CSV con un script bash, un reporte reproducible en Quarto con análisis exploratorio y un **dashboard interactivo** (Quarto + Shiny) para la presentación del TP.
+Proyecto transversal de Programación y Estadística sobre el dataset **Teen Mental Health** (Kaggle). Incluye descarga y limpieza del CSV con bash, un reporte EDA en Quarto y un **dashboard** en la raíz del proyecto (Quarto Dashboard estático con **plotly** y **DT**, mismo enfoque que el proyecto modelo del curso).
 
 Repositorio: https://github.com/Shakkus/TrabajoProgramacionEstadistica
 
@@ -16,52 +16,62 @@ Repositorio: https://github.com/Shakkus/TrabajoProgramacionEstadistica
 - Bash (Git Bash en Windows)
 - [R](https://cran.r-project.org/) y [RStudio](https://posit.co/download/rstudio-desktop/)
 - [Quarto](https://quarto.org/docs/get-started/)
-- Paquetes de R: `tidyverse`, `knitr`, `shiny`
+- Paquetes de R: `tidyverse`, `knitr`, `ggplot2`, `plotly`, `DT`
 
 ```r
-install.packages(c("tidyverse", "knitr", "shiny"))
+install.packages(c("tidyverse", "knitr", "ggplot2", "plotly", "DT"))
 ```
 
-Para la descarga desde Kaggle, configurar el token de la API en `~/.kaggle/kaggle.json` (opcional si ya existe `datos/dataset.csv` o `datos/Teen_Mental_Health.csv`).
+Para la descarga desde Kaggle, configurar el token en `~/.kaggle/kaggle.json` (opcional si ya existe `datos/dataset.csv`).
 
 ## Reproducir el trabajo
 
-1. Clonar el repositorio y abrir `TrabajoProgramacionEstadistica.Rproj` en RStudio.
+1. Clonar el repositorio y abrir **`TrabajoProgramacionEstadistica.Rproj`** en RStudio (directorio de trabajo = raíz del proyecto).
 
-2. Obtener el dataset (elige una opción):
+2. Obtener el dataset:
 
    ```bash
    bash scripts/descarga.sh
    ```
 
-   El script deja `datos/dataset.csv`. Si no usás Kaggle, podés copiar el CSV incluido:
+   O copiar el CSV incluido:
 
    ```bash
    cp datos/Teen_Mental_Health.csv datos/dataset.csv
    ```
 
-3. Renderizar el reporte EDA y el dashboard (desde la raíz del proyecto):
+3. **Renderizar el dashboard** (desde la raíz):
+
+   ```bash
+   quarto render dashboard_salud_mental.qmd
+   ```
+
+   Con `_quarto.yml`, la salida va a **`docs/`** (listo para GitHub Pages con `.nojekyll`).
+
+4. **Renderizar el reporte EDA**:
 
    ```bash
    quarto render scripts/reporte_eda_salud_mental.qmd --to html --output-dir ../reportes
-   cd scripts && quarto render dashboard_salud_mental.qmd --to dashboard && cd ..
    ```
 
-   El dashboard usa Shiny y **debe renderizarse dentro de `scripts/`** (Quarto no permite `--output-dir` con `server: shiny`).
+   Si `quarto` no está en el PATH, cerrá y abrí la terminal, o usá:
 
-   Si aparece `quarto: command not found`, instalá [Quarto](https://quarto.org/docs/get-started/) y **cerrá y volvé a abrir** la terminal (o usá la ruta completa en Windows: `"C:/Program Files/Quarto/bin/quarto.exe" render ...`).
+   ```bash
+   "/c/Program Files/Quarto/bin/quarto.exe" render dashboard_salud_mental.qmd
+   ```
 
-4. Abrir en el navegador:
+5. Abrir en el navegador:
 
-   - `reportes/reporte_eda_salud_mental.html` (junto con `reporte_eda_salud_mental_files`)
-   - `scripts/dashboard_salud_mental.html` (dashboard interactivo; junto con `dashboard_salud_mental_files`)
+   - **Dashboard:** `docs/dashboard_salud_mental.html` (y carpeta `docs/dashboard_salud_mental_files`)
+   - **Reporte EDA:** `reportes/reporte_eda_salud_mental.html` (y `reporte_eda_salud_mental_files`)
 
-## Estructura
 
 | Ruta | Descripción |
 |------|-------------|
+| `_quarto.yml` | Proyecto Quarto tipo *website*; salida en `docs/` |
+| `dashboard_salud_mental.qmd` | Dashboard principal (raíz del proyecto) |
 | `scripts/descarga.sh` | Descarga, descompresión y limpieza del CSV |
-| `scripts/reporte_eda_salud_mental.qmd` | Reporte EDA en Quarto |
-| `scripts/dashboard_salud_mental.qmd` | Dashboard interactivo (Quarto Dashboard + Shiny) |
-| `datos/` | Dataset (`dataset.csv` o `Teen_Mental_Health.csv`) |
-| `reportes/` | HTML generado (reporte y dashboard) |
+| `scripts/reporte_eda_salud_mental.qmd` | Reporte EDA (consigna estadística) |
+| `datos/` | `dataset.csv` / `Teen_Mental_Health.csv` |
+| `docs/` | HTML del dashboard generado |
+| `reportes/` | HTML del reporte EDA generado |
