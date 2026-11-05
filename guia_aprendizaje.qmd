@@ -1,0 +1,302 @@
+---
+title: "Guía de aprendizaje: Salud Mental en Adolescentes"
+subtitle: "Temas, fórmulas y reproducción del proyecto transversal"
+author: "Sebastian Albornoz"
+date: today
+lang: es
+format:
+  typst:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    papersize: a4
+execute:
+  echo: false
+  eval: false
+---
+
+## Propósito de esta guía
+
+Este documento resume **qué enseña el proyecto**, **las fórmulas estadísticas** que aparecen en el reporte EDA y **cómo regenerar** cada artefacto (datos, reporte HTML, dashboard y esta guía en PDF). Está alineado con el repositorio *TrabajoProgramacionEstadistica* y con la consigna de Programación + Estadística descriptiva.
+
+---
+
+# Contexto del proyecto
+
+## Pregunta de investigación
+
+El dataset **Teen Mental Health** (Kaggle) registra hábitos digitales, sueño, rendimiento académico e indicadores de salud mental en adolescentes. El trabajo **no prueba causalidad** en sentido estricto; realiza un **análisis exploratorio (EDA)** para describir distribuciones, medidas de posición y relaciones visuales (por ejemplo, horas en redes vs. puntaje de riesgo).
+
+## Artefactos del repositorio
+
+| Artefacto | Archivo fuente | Salida | Rol |
+|-----------|----------------|--------|-----|
+| Descarga de datos | `scripts/descarga.sh` | `datos/dataset.csv` | CLI + limpieza inicial |
+| Reporte EDA | `scripts/reporte_eda_salud_mental.qmd` | `reportes/reporte_eda_salud_mental.html` | Informe estadístico completo |
+| Dashboard | `dashboard_salud_mental.qmd` | `docs/dashboard_salud_mental.html` | Visualización tipo curso (plotly + DT) |
+| Proyecto Quarto | `_quarto.yml` | carpeta `docs/` | Sitio web / publicación |
+
+## Variables del dataset (16 columnas)
+
+**Numéricas (magnitudes):** edad, horas de redes, horas de sueño, pantalla antes de dormir, rendimiento académico, actividad física, niveles de estrés, ansiedad, adicción, puntaje de riesgo de salud mental.
+
+**Categóricas (etiquetas):** género, plataforma, nivel de interacción social, calidad del sueño, bandera de bienestar digital. La variable `depression_label` viene codificada 0/1; en el reporte se trata como **categoría** para no mezclarla con medidas de tendencia central de variables continuas.
+
+---
+
+# Estadística descriptiva
+
+## Tipos de variables
+
+- **Cuantitativas (numéricas):** valores numéricos donde tiene sentido ordenar y (según el caso) promediar.
+- **Cualitativas (categóricas):** modalidades; se describen con **frecuencias** y **moda**, no con media de la etiqueta.
+
+## Medidas de tendencia central
+
+Sea una muestra de $n$ valores observados $x_1, x_2, \ldots, x_n$ (solo valores no faltantes).
+
+### Media aritmética
+
+$$
+\bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i
+$$
+
+En R: `mean(x, na.rm = TRUE)`.
+
+### Mediana
+
+Valor que deja el 50 % de los datos ordenados por debajo y el 50 % por encima. Si $n$ es impar, es el valor central; si $n$ es par, suele tomarse el promedio de los dos centrales.
+
+En R: `median(x, na.rm = TRUE)`.
+
+### Moda
+
+Valor (o valores) con **mayor frecuencia** en la muestra. Puede haber más de una moda.
+
+En el proyecto: función `calcular_moda()` usando `table()` en R.
+
+## Medidas de posición no centrales (cuantiles)
+
+### Cuartiles
+
+- $Q_1$ (percentil 25): el 25 % de los datos ordenados es $\leq Q_1$.
+- $Q_2$: coincide con la **mediana** (percentil 50).
+- $Q_3$ (percentil 75): el 75 % de los datos ordenados es $\leq Q_3$.
+
+En R: `quantile(x, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)`.
+
+### Deciles y percentiles
+
+- **Decil $D_k$:** valor que deja aproximadamente $10k$ % de los datos por debajo ($k = 1,\ldots,9$).
+- **Percentil $P_p$:** valor que deja $p$ % de los datos por debajo ($p \in [0,100]$).
+
+En el reporte se calculan deciles $D_1$–$D_9$ con `quantile(..., probs = seq(0.1, 0.9, by = 0.1))` y percentiles como $P_5, P_{10}, P_{90}, P_{95}$.
+
+### Rango intercuartílico (IQR)
+
+$$
+\mathrm{IQR} = Q_3 - Q_1
+$$
+
+Resume la dispersión del **50 % central** de los datos.
+
+## Regla de valores atípicos (diagrama de caja)
+
+Criterio clásico de Tukey usado en la tabla de interpretación del reporte:
+
+$$
+L = Q_1 - 1{,}5 \cdot \mathrm{IQR}, \qquad
+U = Q_3 + 1{,}5 \cdot \mathrm{IQR}
+$$
+
+Un valor $x$ se considera **posible atípico** si $x < L$ o $x > U$. Los diagramas de caja de `ggplot2` marcan puntos fuera de bigotes construidos con la misma idea.
+
+## Interpretación de la forma (sesgo)
+
+Comparando media y mediana (criterio del reporte):
+
+- Si $\bar{x} \approx \tilde{x}$ (en el código: $|\bar{x} - \tilde{x}| < 0{,}05$): distribución **aproximadamente simétrica**.
+- Si $\bar{x} > \tilde{x}$: **asimetría hacia la derecha** (cola hacia valores altos).
+- Si $\bar{x} < \tilde{x}$: **asimetría hacia la izquierda**.
+
+Esto es una **heurística visual**, no un test formal de normalidad.
+
+---
+
+# Tablas de frecuencia e histogramas
+
+## Intervalos de clase
+
+Para una variable numérica se particiona el rango en intervalos $[a_j, b_j)$ con:
+
+- **Límite inferior** $a_j$ y **límite superior** $b_j$
+- **Amplitud** $A_j = b_j - a_j$
+- **Marca de clase** (punto medio): $m_j = \dfrac{a_j + b_j}{2}$
+
+En el proyecto, el número de intervalos sigue la regla de **Sturges**:
+
+$$
+k = \lceil 1 + \log_2 n \rceil
+$$
+
+y los cortes se ajustan con `pretty()` en R para obtener límites legibles.
+
+## Frecuencias
+
+Para cada intervalo $j$, con $n$ observaciones totales:
+
+| Concepto | Fórmula | Significado |
+|----------|---------|-------------|
+| Frecuencia absoluta | $f_j$ | Cantidad de datos en el intervalo |
+| Frecuencia relativa | $fr_j = f_j / n$ | Proporción del total |
+| Frecuencia porcentual | $fp_j = 100 \cdot fr_j$ | Porcentaje |
+| Frecuencia acumulada | $F_j = \sum_{i=1}^{j} f_i$ | Suma hasta el intervalo $j$ |
+
+En el reporte, los histogramas usan **los mismos cortes** que la tabla (`calcular_cortes()` + `cut()`), de modo que barras y tabla coinciden.
+
+## Histograma vs. diagrama de caja
+
+- **Histograma:** altura de cada barra proporcional a $f_j$ (intervalos adyacentes).
+- **Diagrama de caja:** resume mediana, cuartiles y atípicos; útil para comparar dispersión sin ver todos los intervalos.
+
+---
+
+# Programación y reproducibilidad
+
+## Script bash (`scripts/descarga.sh`)
+
+Flujo:
+
+1. Descarga el ZIP de Kaggle con `curl`.
+2. Descomprime con `unzip`.
+3. **Limpieza:** `sed` quita BOM UTF-8 del encabezado; `awk` elimina líneas vacías.
+4. Escribe **`datos/dataset.csv`**.
+
+Conceptos de materia: **CLI**, redirección, tuberías (`|`), reproducibilidad del dato crudo → dato listo para R.
+
+## R, tidyverse y Quarto
+
+- **`read.csv` + `as_tibble()`:** importación.
+- **`dplyr`:** `filter`, `summarise`, `group_by`, `mutate`, `across`.
+- **`tidyr`:** `pivot_longer`, `pivot_wider` para tablas en formato largo.
+- **`ggplot2`:** gráficos por capas (`aes`, `geom_*`, `facet_wrap`).
+- **`knitr` + Quarto:** el `.qmd` mezcla Markdown, ecuaciones y chunks `{r}`; al **renderizar** se ejecuta R y se genera HTML/PDF.
+
+## Dashboard (raíz del proyecto)
+
+Formato **`format: dashboard`** con:
+
+- **Value boxes:** KPIs (observaciones, edad media, horas en redes, riesgo medio).
+- **`ggplotly()`:** scatter interactivo (zoom, hover).
+- **`DT::datatable()`:** tabla paginada y buscable.
+
+No usa Shiny servidor: la interactividad va embebida en HTML (como el proyecto modelo del curso).
+
+El archivo **`_quarto.yml`** declara `project: type: website` y `output-dir: docs`, por eso el render del dashboard cae en **`docs/`**.
+
+## Regresión lineal en el scatter del dashboard
+
+`geom_smooth(method = "lm")` ajusta una recta $\hat{y} = a + b x$ por mínimos cuadrados entre horas en redes ($x$) y puntaje de riesgo ($y$). Es **descriptivo/visual**; no sustituye un modelo inferencial completo (no controla confusores ni supuestos).
+
+---
+
+# Cómo reproducir todo el proyecto
+
+## Requisitos
+
+- Git, Bash, R 4.x, RStudio (recomendado), Quarto.
+- Paquetes R:
+
+```r
+install.packages(c(
+  "tidyverse", "knitr", "ggplot2", "plotly", "DT"
+))
+```
+
+## Pasos (desde la raíz del repositorio)
+
+**1. Datos**
+
+```bash
+bash scripts/descarga.sh
+# o, sin Kaggle:
+cp datos/Teen_Mental_Health.csv datos/dataset.csv
+```
+
+**2. Dashboard → `docs/`**
+
+```bash
+quarto render dashboard_salud_mental.qmd
+```
+
+Abrir: `docs/dashboard_salud_mental.html`.
+
+**3. Reporte EDA → `reportes/`**
+
+```bash
+quarto render scripts/reporte_eda_salud_mental.qmd --to html --output-dir ../reportes
+```
+
+Abrir: `reportes/reporte_eda_salud_mental.html` (junto con `reporte_eda_salud_mental_files`).
+
+**4. Esta guía en PDF**
+
+```bash
+quarto render guia_aprendizaje.qmd --to typst --output-dir reportes
+```
+
+Salida: `reportes/guia_aprendizaje.pdf`.
+
+Si `quarto` no está en el PATH (Windows):
+
+```bash
+"/c/Program Files/Quarto/bin/quarto.exe" render guia_aprendizaje.qmd --to typst --output-dir reportes
+```
+
+## Orden recomendado para estudiar
+
+1. Leer esta guía (conceptos y fórmulas).
+2. Abrir el reporte HTML y seguir sección por sección con el `.qmd` en RStudio.
+3. Explorar el dashboard y relacionar cada gráfico con las variables.
+4. Modificar un chunk (por ejemplo, cambiar variable en un histograma) y volver a renderizar para ver el efecto.
+
+---
+
+# Mapa: qué muestra cada pantalla
+
+## Reporte EDA (contenido académico)
+
+1. Descripción del dataset ($n$, $p$).
+2. Clasificación de variables.
+3. Medidas de posición (central + cuantiles + deciles).
+4. Tablas de frecuencia por intervalo.
+5. Histogramas alineados con esas tablas.
+6. Diagramas de caja.
+7. Tabla de interpretación (forma + atípicos + cuartiles).
+
+## Dashboard (síntesis visual)
+
+1. KPIs en value boxes.
+2. Relación redes ↔ riesgo (plotly + recta LM).
+3. Frecuencias de plataforma y bienestar digital.
+4. Promedios de bienestar, boxplot estrés vs. calidad de sueño, histograma de riesgo.
+5. Tabla completa con DT.
+
+---
+
+# Glosario breve
+
+- **EDA:** Exploratory Data Analysis; describir datos antes de modelar.
+- **BOM:** Marca de orden de bytes al inicio de CSV exportados desde Excel.
+- **Quarto:** Herramienta de publicación científica (sucesor spirit de R Markdown).
+- **tidyverse:** conjunto de paquetes R con gramática común para datos tabulares.
+- **Reproducibilidad:** otra persona (o vos en otro PC) puede obtener los mismos resultados siguiendo scripts y versiones documentadas.
+
+---
+
+# Referencias internas
+
+- Código del reporte: `scripts/reporte_eda_salud_mental.qmd`
+- Código del dashboard: `dashboard_salud_mental.qmd`
+- Instrucciones resumidas: `README.md`
+- Dataset: `datos/dataset.csv` (origen Kaggle *teen-mental-health*)
